@@ -1,32 +1,78 @@
 import type { CreatePostInput, Post, UpdatePostInput } from "../types/Post.js";
+import { readFile, writeFile, rename } from "node:fs/promises";
+import { isPost } from "../validators/PostValidator.js";
 
-// In-memory "database". Fine while learning — it's wiped on every restart.
-const posts: Post[] = [
-    {
-        id: 1,
-        title: "First Post",
-        image: "https://example.com/first-post.jpg",
-        content: "This is the content of the first post."
-    },
-    {
-        id: 2,
-        title: "Second Post",
-        image: "https://example.com/second-post.jpg",
-        content: "This is the content of the second post."
-    }
-];
+// The "database": an in-memory array seeded from data/posts.json at
+// startup (see initialize). API changes live only in memory — they are
+// NOT written back to the file, so a restart resets to the file's
+// contents. Swapping in a real database later means replacing the
+// storage inside this class; every caller keeps the same signatures.
+let posts: Post[] = [];
 
-/** ID for the next post created — incremented so IDs are never reused. */
-let nextPostId = 3;
+/** ID for the next post created — re-derived from the data at startup
+ * (highest existing ID + 1), then incremented so IDs are never reused. */
+let nextPostId = 1;
+
+let writeQueue: Promise<void> = Promise.resolve();
+
+function savePosts(): Promise<void> {
+    const contents = JSON.stringify(posts, null, 2)
+}
 
 export class PostService {
+
+    /**
+     * Loads and validates data/posts.json into memory. Must run once
+     * BEFORE the server accepts requests — server.ts awaits it prior
+     * to app.listen.
+     *
+     * Fail-fast by design: a malformed file, a non-post entry, or
+     * duplicate IDs throws and startup aborts — better than silently
+     * serving from an empty or half-valid store.
+     *
+     * @throws Error when the file is missing, is not an array of
+     *   valid posts, or contains duplicate IDs.
+     */
+    static async initialize(): Promise<void> {
+        // NOTE: this path is relative to the process's working
+        // directory — run npm commands from the project root. (A more
+        // robust version would resolve the path from this module's URL.)
+        const contents = await readFile("data/posts.json", "utf8");
+        // JSON.parse returns untrusted data — its type cannot be known
+        // from the file alone, so treat it as `unknown` and validate.
+        const data: unknown = JSON.parse(contents);
+
+        // data.every(isPost): the type guard narrows every entry to
+        // Post before anything is assigned to the store.
+        if (!Array.isArray(data) || !data.every(isPost)) {
+            throw new Error("Post data must be an array of valid posts.");
+        }
+
+        // A Set drops duplicate values — if it's smaller than the
+        // array, some IDs were reused.
+        const ids = new Set(data.map(post => post.id));
+
+        if (ids.size !== data.length) {
+            throw new Error("Post data contains duplicate IDs.");
+        }
+
+        posts = data;
+
+        // Derive the next ID from the data instead of hardcoding it:
+        // highest existing ID + 1, so new posts never collide.
+        nextPostId =
+            posts.reduce((highestId, post) => {
+                return Math.max(highestId, post.id);
+            }, 0) + 1;
+    }
+
     /**
      * Returns all posts.
      *
-     * Async even though the in-memory store is synchronous: this is
-     * the exact signature a real database call would need, so callers
-     * are already written correctly for when I/O arrives. The `async`
-     * keyword wraps the returned array in a Promise automatically.
+     * Async because the store is loaded from disk at startup (and may
+     * become a real database later): callers are already written for
+     * I/O-shaped signatures. Reads themselves stay synchronous — the
+     * data lives in memory after initialize().
      */
     async getAllPosts(): Promise<Post[]> {
         return posts;

@@ -1,4 +1,4 @@
-import type { CreatePostInput, UpdatePostInput } from '../types/Post.js'
+import type { CreatePostInput, UpdatePostInput, Post } from '../types/Post.js'
 
 /**
  * Type guard for POST /api/posts bodies.
@@ -40,5 +40,23 @@ export function isUpdatePostInput(
         ("title" in value ? typeof value.title === "string" : true) &&
         ("image" in value ? typeof value.image === "string" : true) &&
         ("content" in value ? typeof value.content === "string" : true)
+    );
+}
+
+/**
+ * Type guard for a complete, stored Post: every required field AND a
+ * valid id. Composed from isCreatePostInput, so the field rules live
+ * in exactly one place.
+ *
+ * Used by PostService.initialize() to validate data/posts.json at
+ * startup — file data is untrusted input, exactly like a request body.
+ */
+export function isPost(value: unknown): value is Post {
+    return (
+        isCreatePostInput(value) &&
+        "id" in value &&
+        typeof value.id === "number" &&
+        Number.isSafeInteger(value.id) &&
+        value.id > 0
     );
 }
