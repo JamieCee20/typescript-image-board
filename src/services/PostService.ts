@@ -1,4 +1,4 @@
-import type { CreatePostInput, Post } from "../types/Post.js";
+import type { CreatePostInput, Post, UpdatePostInput } from "../types/Post.js";
 
 const posts: Post[] = [
     {
@@ -33,5 +33,25 @@ export class PostService {
         };
         posts.push(newPost);
         return newPost;
+    }
+
+    updatePost(id: number, input: UpdatePostInput): Post | undefined {
+        const post = this.getPostById(id);
+
+        if (!post) {
+            return undefined;
+        }
+
+        if (input.title !== undefined) {
+            post.title = input.title;
+        }
+        if (input.image !== undefined) {
+            post.image = input.image;
+        }
+        if (input.content !== undefined) {
+            post.content = input.content;
+        }
+
+        return post;
     }
 }

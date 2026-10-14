@@ -6,3 +6,4 @@ export interface Post {
 }
 
 export type CreatePostInput = Omit<Post, "id">;
+export type UpdatePostInput = Partial<CreatePostInput>;

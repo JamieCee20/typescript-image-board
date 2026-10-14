@@ -12,6 +12,7 @@ A small REST API for an image board — posts with a title, image URL, and conte
 | GET    | `/posts`        | List all posts           |
 | GET    | `/posts/:id`    | Get a single post by ID  |
 | POST   | `/posts`        | Create a new post        |
+| PATCH  | `/posts/:id`    | Partially update a post  |
 
 ## Tech stack
 
@@ -44,3 +45,4 @@ src/
 
 - Data is stored **in memory** — everything resets when the server restarts. No database (yet).
 - Request bodies are validated at runtime with a hand-written type guard, since Express can't know the shape of `req.body` on its own.
+- `PATCH /posts/:id` accepts a **partial** body (`Partial<CreatePostInput>`) — only the fields you supply are updated; supplying none or empty values is rejected with `400`.

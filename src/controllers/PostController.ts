@@ -1,10 +1,11 @@
 import type { Request, Response } from "express";
-import { isCreatePostInput } from "../validators/PostValidator.js";
+import { isCreatePostInput, isUpdatePostInput } from "../validators/PostValidator.js";
 import { PostService } from "../services/PostService.js";
-import type { Post } from "../types/Post.js";
+import type { Post, UpdatePostInput } from "../types/Post.js";
 
 type CreatePostResponse = Post | { error: string };
 type GetPostResponse = Post | { error: string };
+type UpdatePostResponse = Post | { error: string };
 type GetPostSResponse = Post[] | { error: string };
 type PostIdParams = {
     id: string;
@@ -59,5 +60,71 @@ export class PostController {
         const newPost = postService.createPost({ title, image, content });
         res.status(201).json(newPost);
 
+    }
+
+    static updatePost(
+        req: Request<PostIdParams, UpdatePostResponse, unknown>,
+        res: Response<UpdatePostResponse>
+    ): void {
+        const id = Number(req.params.id);
+
+        if (!Number.isSafeInteger(id) || id <= 0) {
+            res.status(400).json({
+                error: "Post ID must be a positive integer."
+            });
+            return;
+        }
+
+        const body = req.body;
+
+        if (!isUpdatePostInput(body)) {
+            res.status(400).json({
+                error: "Request body must be an object, and supplied post fields must be strings."
+            });
+            return;
+        }
+
+        const input: UpdatePostInput = {};
+
+        if (body.title !== undefined) {
+            input.title = body.title.trim();
+        }
+
+        if (body.image !== undefined) {
+            input.image = body.image.trim();
+        }
+
+        if (body.content !== undefined) {
+            input.content = body.content.trim();
+        }
+
+        if (Object.keys(input).length === 0) {
+            res.status(400).json({
+                error: "Supply at least one field: title, image or content."
+            });
+            return;
+        }
+
+        if (
+            input.title === "" ||
+            input.image === "" ||
+            input.content === ""
+        ) {
+            res.status(400).json({
+                error: "Supplied fields must not be empty."
+            });
+            return;
+        }
+
+        const post = postService.updatePost(id, input);
+
+        if (!post) {
+            res.status(404).json({
+                error: "Post not found."
+            });
+            return;
+        }
+
+        res.json(post);
     }
 }

@@ -11,5 +11,6 @@ app.get("/", (req, res) => {
 app.get("/posts", PostController.getAllPosts);
 app.get("/posts/:id", PostController.getPostById);
 app.post("/posts", PostController.createPost);
+app.patch("/posts/:id", PostController.updatePost);
 
 export default app;
