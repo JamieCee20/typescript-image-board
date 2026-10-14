@@ -6,13 +6,14 @@ A small REST API for an image board — posts with a title, image URL, and conte
 
 ## Endpoints
 
-| Method | Route           | Description              |
-| ------ | --------------- | ------------------------ |
-| GET    | `/`             | Health check             |
-| GET    | `/posts`        | List all posts           |
-| GET    | `/posts/:id`    | Get a single post by ID  |
-| POST   | `/posts`        | Create a new post        |
-| PATCH  | `/posts/:id`    | Partially update a post  |
+| Method | Route           | Description                  |
+| ------ | --------------- | ---------------------------- |
+| GET    | `/`             | Health check                 |
+| GET    | `/posts`        | List all posts               |
+| GET    | `/posts/:id`    | Get a single post by ID      |
+| POST   | `/posts`        | Create a new post            |
+| PATCH  | `/posts/:id`    | Partially update a post      |
+| DELETE | `/posts/:id`    | Delete a post (204, no body) |
 
 ## Tech stack
 
@@ -33,12 +34,13 @@ The server starts at `http://localhost:3000`.
 
 ```
 src/
-├── server.ts                 # Entry point — starts the HTTP server
-├── app.ts                    # Express app & route definitions
-├── types/Post.ts             # Post interface & input types
+├── server.ts                      # Entry point — starts the HTTP server
+├── app.ts                         # Express app — mounts middleware & routers
+├── routes/PostRoutes.ts           # Post router — maps routes to controller
+├── types/Post.ts                  # Post interface & input types
 ├── controllers/PostController.ts  # Request handling & validation responses
-├── validators/PostValidator.ts    # Runtime type guard for request bodies
-└── services/PostService.ts   # Business logic & in-memory data store
+├── validators/PostValidator.ts    # Runtime type guards for request bodies
+└── services/PostService.ts        # Business logic & in-memory data store
 ```
 
 ## Notes

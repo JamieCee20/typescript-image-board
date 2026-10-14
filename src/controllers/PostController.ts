@@ -7,9 +7,12 @@ type CreatePostResponse = Post | { error: string };
 type GetPostResponse = Post | { error: string };
 type UpdatePostResponse = Post | { error: string };
 type GetPostSResponse = Post[] | { error: string };
+type DeletePostResponse = { error: string };
+
 type PostIdParams = {
     id: string;
 };
+
 const postService = new PostService();
 
 export class PostController {
@@ -126,5 +129,30 @@ export class PostController {
         }
 
         res.json(post);
+    }
+
+    static deletePost(
+        req: Request<PostIdParams, DeletePostResponse, unknown>,
+        res: Response<DeletePostResponse>
+    ): void {
+        const id = Number(req.params.id);
+
+        if (!Number.isSafeInteger(id) || id <= 0) {
+            res.status(400).json({
+                error: "Post ID must be a positive integer."
+            });
+            return;
+        }
+
+        const deleted = postService.deletePost(id);
+
+        if (!deleted) {
+            res.status(404).json({
+                error: "Post not found."
+            });
+            return;
+        }
+
+        res.status(204).send();
     }
 }
