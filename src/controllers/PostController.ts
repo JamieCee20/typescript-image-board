@@ -20,9 +20,17 @@ type PostIdParams = {
 const postService = new PostService();
 
 export class PostController {
-    /** Returns every post as JSON. */
-    static getAllPosts(req: Request<Record<string, never>, GetPostSResponse, unknown>, res: Response<GetPostSResponse>): void {
-        const posts = postService.getAllPosts();
+    /**
+     * Returns every post as JSON.
+     *
+     * Async handler: awaits the service, returns Promise<void> —
+     * handlers respond via `res`, they don't return data. In Express 5
+     * a rejected promise from an async handler is forwarded to the
+     * error middleware automatically, so no try/catch is needed here
+     * (in Express 4 that was a manual chore).
+     */
+    static async getAllPosts(req: Request<Record<string, never>, GetPostSResponse, unknown>, res: Response<GetPostSResponse>): Promise<void> {
+        const posts = await postService.getAllPosts();
         res.json(posts);
     }
 

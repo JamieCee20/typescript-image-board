@@ -20,8 +20,15 @@ const posts: Post[] = [
 let nextPostId = 3;
 
 export class PostService {
-    /** Returns all posts. */
-    getAllPosts(): Post[] {
+    /**
+     * Returns all posts.
+     *
+     * Async even though the in-memory store is synchronous: this is
+     * the exact signature a real database call would need, so callers
+     * are already written correctly for when I/O arrives. The `async`
+     * keyword wraps the returned array in a Promise automatically.
+     */
+    async getAllPosts(): Promise<Post[]> {
         return posts;
     }
 

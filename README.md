@@ -49,4 +49,5 @@ src/
 - All resource routes are grouped under **`/api`** by a central router (`src/routes/index.ts`), keeping `app.ts` minimal and leaving room for future API versioning (e.g. `/api/v1`).
 - Data is stored **in memory** — everything resets when the server restarts. No database (yet).
 - Request bodies are validated at runtime with a hand-written type guard, since Express can't know the shape of `req.body` on its own.
-- `PATCH /posts/:id` accepts a **partial** body (`Partial<CreatePostInput>`) — only the fields you supply are updated; supplying none or empty values is rejected with `400`.
+- `PATCH /api/posts/:id` accepts a **partial** body (`Partial<CreatePostInput>`) — only the fields you supply are updated; supplying none or empty values is rejected with `400`.
+- **Async handlers:** `PostService.getAllPosts()` returns `Promise<Post[]>` and its controller `await`s it. The in-memory store is synchronous today, but this is exactly the signature a database call will need — so no caller changes when real I/O arrives. Express 5 also forwards rejected promises from async handlers straight to the error middleware, so `throw`/`reject` needs no `try/catch` (unlike Express 4).
