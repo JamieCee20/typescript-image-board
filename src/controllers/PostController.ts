@@ -1,8 +1,12 @@
 import type { Request, Response } from "express";
+import type { Post, UpdatePostInput } from "../types/Post.js";
 import { isCreatePostInput, isUpdatePostInput } from "../validators/PostValidator.js";
 import { PostService } from "../services/PostService.js";
-import type { Post, UpdatePostInput } from "../types/Post.js";
+import { HttpError } from "../errors/HttpError.js";
+import { parsePositiveId } from "../utils/parsePositiveId.js";
 
+// Union types: each endpoint responds with Post (or Post[]) on success,
+// or { error: string } on failure.
 type CreatePostResponse = Post | { error: string };
 type GetPostResponse = Post | { error: string };
 type UpdatePostResponse = Post | { error: string };
@@ -16,37 +20,38 @@ type PostIdParams = {
 const postService = new PostService();
 
 export class PostController {
+    /** Returns every post as JSON. */
     static getAllPosts(req: Request<Record<string, never>, GetPostSResponse, unknown>, res: Response<GetPostSResponse>): void {
         const posts = postService.getAllPosts();
         res.json(posts);
     }
 
+    /**
+     * Returns a single post by ID.
+     * @throws HttpError 400 if :id is not a positive integer.
+     * @throws HttpError 404 if no post has that ID.
+     */
     static getPostById(req: Request<PostIdParams, GetPostResponse, unknown>, res: Response<GetPostResponse>): void {
-        const id = Number(req.params.id);
-        if (!Number.isSafeInteger(id) || id <= 0) {
-            res.status(400).json({ error: "Invalid post ID" });
-            return;
-        }
+        const id = parsePositiveId(req.params.id);
 
         const post = postService.getPostById(id);
 
         if (!post) {
-            res.status(404).json({ error: "Post not found" });
-            return;
+            throw new HttpError(404, "Post not found.");
         }
 
         res.json(post);
     }
 
-    // static createPost(req: Request, res: Response): void {
+    /**
+     * Validates and creates a new post, returning it with 201 Created.
+     * @throws HttpError 400 when the body fails the type guard or a field is blank.
+     */
     static createPost(req: Request<Record<string, never>, CreatePostResponse, unknown>, res: Response<CreatePostResponse>): void {
         const body = req.body;
 
         if (!isCreatePostInput(body)) {
-            res.status(400).json({
-                error: "Missing required fields or invalid field types"
-            });
-            return;
+            throw new HttpError(400, "Missing required fields or invalid field types");
         }
 
         const title = body.title.trim();
@@ -54,10 +59,7 @@ export class PostController {
         const content = body.content.trim();
 
         if (!title || !image || !content) {
-            res.status(400).json({
-                error: "All fields are required"
-            });
-            return;
+            throw new HttpError(400, "All fields are required");
         }
 
         const newPost = postService.createPost({ title, image, content });
@@ -65,26 +67,22 @@ export class PostController {
 
     }
 
+    /**
+     * Partially updates a post (PATCH semantics): only the supplied
+     * fields change; omitted fields keep their current value.
+     * @throws HttpError 400 for a bad ID, bad body, no fields, or empty values.
+     * @throws HttpError 404 when the post doesn't exist.
+     */
     static updatePost(
         req: Request<PostIdParams, UpdatePostResponse, unknown>,
         res: Response<UpdatePostResponse>
     ): void {
-        const id = Number(req.params.id);
-
-        if (!Number.isSafeInteger(id) || id <= 0) {
-            res.status(400).json({
-                error: "Post ID must be a positive integer."
-            });
-            return;
-        }
+        const id = parsePositiveId(req.params.id);
 
         const body = req.body;
 
         if (!isUpdatePostInput(body)) {
-            res.status(400).json({
-                error: "Request body must be an object, and supplied post fields must be strings."
-            });
-            return;
+            throw new HttpError(400, "Request body must be an object, and supplied post fields must be strings.");
         }
 
         const input: UpdatePostInput = {};
@@ -102,10 +100,7 @@ export class PostController {
         }
 
         if (Object.keys(input).length === 0) {
-            res.status(400).json({
-                error: "Supply at least one field: title, image or content."
-            });
-            return;
+            throw new HttpError(400, "Supply at least one field: title, image or content.");
         }
 
         if (
@@ -113,44 +108,33 @@ export class PostController {
             input.image === "" ||
             input.content === ""
         ) {
-            res.status(400).json({
-                error: "Supplied fields must not be empty."
-            });
-            return;
+            throw new HttpError(400, "Supplied fields must not be empty.");
         }
 
         const post = postService.updatePost(id, input);
 
         if (!post) {
-            res.status(404).json({
-                error: "Post not found."
-            });
-            return;
+            throw new HttpError(404, "Post not found.");
         }
 
         res.json(post);
     }
 
+    /**
+     * Deletes a post, responding 204 No Content on success.
+     * @throws HttpError 400 if :id is not a positive integer.
+     * @throws HttpError 404 if no post has that ID.
+     */
     static deletePost(
         req: Request<PostIdParams, DeletePostResponse, unknown>,
         res: Response<DeletePostResponse>
     ): void {
-        const id = Number(req.params.id);
-
-        if (!Number.isSafeInteger(id) || id <= 0) {
-            res.status(400).json({
-                error: "Post ID must be a positive integer."
-            });
-            return;
-        }
+        const id = parsePositiveId(req.params.id);
 
         const deleted = postService.deletePost(id);
 
         if (!deleted) {
-            res.status(404).json({
-                error: "Post not found."
-            });
-            return;
+            throw new HttpError(404, "Post not found.");
         }
 
         res.status(204).send();
