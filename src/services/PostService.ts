@@ -1,48 +1,39 @@
 import type { CreatePostInput, Post, UpdatePostInput } from "../types/Post.js";
 import type { PostRepository } from "../repositories/PostRepository.js";
-import { FilePostRepository } from "../repositories/FilePostRepository.js";
 
 /**
- * The storage backend, typed as the PostRepository INTERFACE — not the
- * concrete class. This is dependency inversion: the service never knows
- * a file is involved, and swapping to a database (or an in-memory fake
- * in tests) is a one-line change here.
+ * Business logic for posts, with state held per-instance (no more
+ * module globals): every PostService owns its own store and ID
+ * counter, and receives its storage via constructor injection — so a
+ * test could construct one with an in-memory repository and never
+ * touch disk. The application's single shared instance is wired up in
+ * src/container.ts.
  */
-const postRepository: PostRepository =
-    new FilePostRepository("data/posts.json");
-
-// The "database": an in-memory array seeded by postRepository.load()
-// at startup (see initialize) and persisted via postRepository.save()
-// after every mutation (see savePosts) — so changes SURVIVE restarts.
-// All disk I/O lives in the repository; this class keeps memory + rules.
-let posts: Post[] = [];
-
-/** ID for the next post created — re-derived from the data at startup
- * (highest existing ID + 1), then incremented so IDs are never reused. */
-let nextPostId = 1;
-
-/**
- * Serializes disk writes. Every save chains onto the previous one, so
- * two concurrent requests can never interleave half-written files.
- * Starts resolved so the very first save runs immediately.
- */
-let writeQueue: Promise<void> = Promise.resolve();
-
-/**
- * Persists the in-memory store through the repository.
- *
- * The HOW (atomic temp-file write, write queue) lives in
- * FilePostRepository — this is just the bridge from the service's
- * memory to whatever storage backend is configured.
- *
- * @throws when persistence fails; the service methods let that
- *   rejection bubble up to the error handler as a 500.
- */
-function savePosts(): Promise<void> {
-    return postRepository.save(posts);
-}
-
 export class PostService {
+    /** The in-memory store, seeded by initialize() and re-persisted by
+     * savePosts() after every mutation. */
+    private posts: Post[] = [];
+
+    /** ID for the next post created — re-derived from the loaded data
+     * (highest existing ID + 1), then incremented so IDs are never reused. */
+    private nextPostId = 1;
+
+    /** Storage backend — the PostRepository CONTRACT, injected rather
+     * than constructed here (dependency inversion). `readonly` = set
+     * once by the constructor, never reassigned. */
+    private readonly repository: PostRepository;
+    constructor(repository: PostRepository) {
+        this.repository = repository;
+    }
+
+    /**
+     * Persists the in-memory store through the injected repository.
+     * @throws when persistence fails; callers let the rejection bubble
+     *   up to the error handler as a 500.
+     */
+    private savePosts(): Promise<void> {
+        return this.repository.save(this.posts);
+    }
 
     /**
      * Loads the store from the repository into memory. Must run once
@@ -55,14 +46,14 @@ export class PostService {
      *
      * @throws when the repository cannot produce valid data.
      */
-    static async initialize(): Promise<void> {
-        posts = await postRepository.load();
+    async initialize(): Promise<void> {
+        this.posts = await this.repository.load();
 
         // Derive the next ID from the loaded data instead of
         // hardcoding it: highest existing ID + 1, so new posts never
         // collide with anything already stored.
-        nextPostId =
-            posts.reduce((highestId, post) => {
+        this.nextPostId =
+            this.posts.reduce((highestId, post) => {
                 return Math.max(highestId, post.id);
             }, 0) + 1;
     }
@@ -70,18 +61,22 @@ export class PostService {
     /**
      * Returns all posts.
      *
-     * Async because the store is loaded from disk at startup (and may
-     * become a real database later): callers are already written for
-     * I/O-shaped signatures. Reads themselves stay synchronous — the
-     * data lives in memory after initialize().
+     * Async-shaped for the same reason as the mutations: callers are
+     * written against I/O signatures, so swapping in a real database
+     * requires no changes here. Reads stay in memory — Promise.resolve
+     * just satisfies the declared contract.
+     *
+     * NOTE: this hands out the live internal array. Fine while the
+     * service is the only writer; a hardened version would return a
+     * copy so callers can't mutate the store from outside.
      */
-    async getAllPosts(): Promise<Post[]> {
-        return posts;
+    getAllPosts(): Promise<Post[]> {
+        return Promise.resolve(this.posts);
     }
 
     /** Finds a post by ID, or returns undefined if it doesn't exist. */
     getPostById(id: number): Post | undefined {
-        return posts.find(post => post.id === id);
+        return this.posts.find(post => post.id === id);
     }
 
     /**
@@ -97,10 +92,10 @@ export class PostService {
     async createPost(input: CreatePostInput): Promise<Post> {
         const newPost: Post = {
             ...input,
-            id: nextPostId++,
+            id: this.nextPostId++,
         };
-        posts.push(newPost);
-        await savePosts();
+        this.posts.push(newPost);
+        await this.savePosts();
         return newPost;
     }
 
@@ -127,7 +122,7 @@ export class PostService {
             post.content = input.content;
         }
 
-        await savePosts();
+        await this.savePosts();
         return post;
     }
 
@@ -137,14 +132,14 @@ export class PostService {
      * @throws when persisting to disk fails.
      */
     async deletePost(id: number): Promise<boolean> {
-        const index = posts.findIndex(post => post.id === id);
+        const index = this.posts.findIndex(post => post.id === id);
 
         if (index === -1) {
             return false;
         }
 
-        posts.splice(index, 1);
-        await savePosts();
+        this.posts.splice(index, 1);
+        await this.savePosts();
         return true;
     }
 }

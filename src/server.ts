@@ -1,5 +1,5 @@
 import app from "./app.js";
-import { PostService } from "./services/PostService.js";
+import { postService } from "./container.js";
 
 // Entry point. Deliberately minimal — all wiring lives in app.ts, so
 // the app can be imported (and tested) without opening a port.
@@ -14,7 +14,7 @@ const PORT = 3000;
  * beats silently serving an empty API.
  */
 async function startServer(): Promise<void> {
-    await PostService.initialize();
+    await postService.initialize();
 
     app.listen(PORT, () => {
         console.log(`Server running at http://localhost:${PORT}`);

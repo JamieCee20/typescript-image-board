@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import type { Post, UpdatePostInput } from "../types/Post.js";
 import { isCreatePostInput, isUpdatePostInput } from "../validators/PostValidator.js";
-import { PostService } from "../services/PostService.js";
+import { postService } from "../container.js";
 import { HttpError } from "../errors/HttpError.js";
 import { parsePositiveId } from "../utils/parsePositiveId.js";
 
@@ -16,8 +16,6 @@ type DeletePostResponse = { error: string };
 type PostIdParams = {
     id: string;
 };
-
-const postService = new PostService();
 
 export class PostController {
     /**

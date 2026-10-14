@@ -39,6 +39,7 @@ data/
 src/
 ├── server.ts                      # Entry point — initialises the store, then starts the server
 ├── app.ts                         # Express app — mounts middleware & the central router
+├── container.ts                   # Composition root — constructs & wires the repository + service
 ├── routes/index.ts                # Central router — aggregates resource routers under /api
 ├── routes/PostRoutes.ts           # Post router — maps routes to the controller
 ├── types/Post.ts                  # Post interface & input types
@@ -47,7 +48,7 @@ src/
 ├── repositories/                  # Storage layer (Repository pattern)
 │   ├── PostRepository.ts          #   interface — the storage contract
 │   └── FilePostRepository.ts      #   JSON-file implementation (atomic writes, write queue)
-└── services/PostService.ts        # Business logic — storage delegated to PostRepository
+└── services/PostService.ts        # Business logic — repository injected via constructor
 ```
 
 ## Notes
@@ -55,6 +56,7 @@ src/
 - All resource routes are grouped under **`/api`** by a central router (`src/routes/index.ts`), keeping `app.ts` minimal and leaving room for future API versioning (e.g. `/api/v1`).
 - **Data** lives in `data/posts.json`: loaded once at startup (validated — shape via a type guard, plus a duplicate-ID check; a bad file aborts startup) and **written back after every change**. Writes are atomic (`.tmp` file + rename) and serialized through a write queue, so changes survive restarts and concurrent requests can't corrupt the file. Reads are served from memory.
 - **Storage sits behind the `PostRepository` interface** (Repository pattern): `PostService` depends only on the contract, and `FilePostRepository` is currently its one implementation. Adding a database means writing a new implementation and changing one construction line — no service, controller, or route changes.
+- **Dependencies are injected**: `PostService` receives its storage through its constructor, and `src/container.ts` is the *composition root* — the only file that knows which concrete classes plug together. Testing with an in-memory repository, or swapping backends, touches nothing else.
 - Request bodies are validated at runtime with a hand-written type guard, since Express can't know the shape of `req.body` on its own.
 - `PATCH /api/posts/:id` accepts a **partial** body (`Partial<CreatePostInput>`) — only the fields you supply are updated; supplying none or empty values is rejected with `400`.
 - **Async handlers:** `PostService.getAllPosts()` returns `Promise<Post[]>` and its controller `await`s it. The in-memory store is synchronous today, but this is exactly the signature a database call will need — so no caller changes when real I/O arrives. Express 5 also forwards rejected promises from async handlers straight to the error middleware, so `throw`/`reject` needs no `try/catch` (unlike Express 4).
