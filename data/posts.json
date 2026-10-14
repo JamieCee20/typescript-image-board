@@ -1,7 +1,7 @@
 [
     {
         "id": 1,
-        "title": "First Post Test",
+        "title": "First Post",
         "image": "https://example.com/first-post.jpg",
         "content": "This is the content of the first post."
     },

@@ -5,6 +5,9 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Transient files from atomic writes (data/posts.json.tmp)
+*.tmp
+
 # Environment variables / secrets
 .env
 .env.*

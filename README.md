@@ -34,7 +34,7 @@ The server starts at `http://localhost:3000`.
 
 ```
 data/
-└── posts.json                     # Seed data — loaded once at startup
+└── posts.json                     # Post data — loaded at startup, written back on changes
 
 src/
 ├── server.ts                      # Entry point — initialises the store, then starts the server
@@ -44,13 +44,13 @@ src/
 ├── types/Post.ts                  # Post interface & input types
 ├── controllers/PostController.ts  # Request handling & validation responses
 ├── validators/PostValidator.ts    # Runtime type guards for request bodies & seed data
-└── services/PostService.ts        # Business logic & data store (seeded from data/posts.json)
+└── services/PostService.ts        # Business logic & data store (persisted to data/posts.json)
 ```
 
 ## Notes
 
 - All resource routes are grouped under **`/api`** by a central router (`src/routes/index.ts`), keeping `app.ts` minimal and leaving room for future API versioning (e.g. `/api/v1`).
-- **Data** is loaded once at startup from `data/posts.json` and validated before use (shape via a type guard, plus a duplicate-ID check) — a bad file aborts startup. API changes are kept in memory and **not written back**, so restarting resets to the file's contents. This is the seam where a real database plugs in: swap the storage inside `PostService`, and every caller keeps the same signatures.
+- **Data** lives in `data/posts.json`: loaded once at startup (validated — shape via a type guard, plus a duplicate-ID check; a bad file aborts startup) and **written back after every change**. Writes are atomic (`.tmp` file + rename) and serialized through a write queue, so changes survive restarts and concurrent requests can't corrupt the file. Reads are served from memory. This remains the seam for a real database: swap the storage inside `PostService`, and every caller keeps the same signatures.
 - Request bodies are validated at runtime with a hand-written type guard, since Express can't know the shape of `req.body` on its own.
 - `PATCH /api/posts/:id` accepts a **partial** body (`Partial<CreatePostInput>`) — only the fields you supply are updated; supplying none or empty values is rejected with `400`.
 - **Async handlers:** `PostService.getAllPosts()` returns `Promise<Post[]>` and its controller `await`s it. The in-memory store is synchronous today, but this is exactly the signature a database call will need — so no caller changes when real I/O arrives. Express 5 also forwards rejected promises from async handlers straight to the error middleware, so `throw`/`reject` needs no `try/catch` (unlike Express 4).

@@ -53,9 +53,11 @@ export class PostController {
 
     /**
      * Validates and creates a new post, returning it with 201 Created.
+     * The post is persisted to disk before responding; a save failure
+     * surfaces as a 500 via the error handler.
      * @throws HttpError 400 when the body fails the type guard or a field is blank.
      */
-    static createPost(req: Request<Record<string, never>, CreatePostResponse, unknown>, res: Response<CreatePostResponse>): void {
+    static async createPost(req: Request<Record<string, never>, CreatePostResponse, unknown>, res: Response<CreatePostResponse>): Promise<void> {
         const body = req.body;
 
         if (!isCreatePostInput(body)) {
@@ -70,7 +72,7 @@ export class PostController {
             throw new HttpError(400, "All fields are required");
         }
 
-        const newPost = postService.createPost({ title, image, content });
+        const newPost = await postService.createPost({ title, image, content });
         res.status(201).json(newPost);
 
     }
@@ -78,13 +80,15 @@ export class PostController {
     /**
      * Partially updates a post (PATCH semantics): only the supplied
      * fields change; omitted fields keep their current value.
+     * The change is persisted to disk before responding; a save
+     * failure surfaces as a 500 via the error handler.
      * @throws HttpError 400 for a bad ID, bad body, no fields, or empty values.
      * @throws HttpError 404 when the post doesn't exist.
      */
-    static updatePost(
+    static async updatePost(
         req: Request<PostIdParams, UpdatePostResponse, unknown>,
         res: Response<UpdatePostResponse>
-    ): void {
+    ): Promise<void> {
         const id = parsePositiveId(req.params.id);
 
         const body = req.body;
@@ -119,7 +123,7 @@ export class PostController {
             throw new HttpError(400, "Supplied fields must not be empty.");
         }
 
-        const post = postService.updatePost(id, input);
+        const post = await postService.updatePost(id, input);
 
         if (!post) {
             throw new HttpError(404, "Post not found.");
@@ -130,16 +134,18 @@ export class PostController {
 
     /**
      * Deletes a post, responding 204 No Content on success.
+     * The deletion is persisted to disk before responding; a save
+     * failure surfaces as a 500 via the error handler.
      * @throws HttpError 400 if :id is not a positive integer.
      * @throws HttpError 404 if no post has that ID.
      */
-    static deletePost(
+    static async deletePost(
         req: Request<PostIdParams, DeletePostResponse, unknown>,
         res: Response<DeletePostResponse>
-    ): void {
+    ): Promise<void> {
         const id = parsePositiveId(req.params.id);
 
-        const deleted = postService.deletePost(id);
+        const deleted = await postService.deletePost(id);
 
         if (!deleted) {
             throw new HttpError(404, "Post not found.");
