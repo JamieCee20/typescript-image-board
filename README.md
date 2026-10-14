@@ -6,14 +6,14 @@ A small REST API for an image board — posts with a title, image URL, and conte
 
 ## Endpoints
 
-| Method | Route           | Description                  |
-| ------ | --------------- | ---------------------------- |
-| GET    | `/`             | Health check                 |
-| GET    | `/posts`        | List all posts               |
-| GET    | `/posts/:id`    | Get a single post by ID      |
-| POST   | `/posts`        | Create a new post            |
-| PATCH  | `/posts/:id`    | Partially update a post      |
-| DELETE | `/posts/:id`    | Delete a post (204, no body) |
+| Method | Route               | Description                  |
+| ------ | ------------------- | ---------------------------- |
+| GET    | `/`                 | Health check                 |
+| GET    | `/api/posts`        | List all posts               |
+| GET    | `/api/posts/:id`    | Get a single post by ID      |
+| POST   | `/api/posts`        | Create a new post            |
+| PATCH  | `/api/posts/:id`    | Partially update a post      |
+| DELETE | `/api/posts/:id`    | Delete a post (204, no body) |
 
 ## Tech stack
 
@@ -35,8 +35,9 @@ The server starts at `http://localhost:3000`.
 ```
 src/
 ├── server.ts                      # Entry point — starts the HTTP server
-├── app.ts                         # Express app — mounts middleware & routers
-├── routes/PostRoutes.ts           # Post router — maps routes to controller
+├── app.ts                         # Express app — mounts middleware & the central router
+├── routes/index.ts                # Central router — aggregates resource routers under /api
+├── routes/PostRoutes.ts           # Post router — maps routes to the controller
 ├── types/Post.ts                  # Post interface & input types
 ├── controllers/PostController.ts  # Request handling & validation responses
 ├── validators/PostValidator.ts    # Runtime type guards for request bodies
@@ -45,6 +46,7 @@ src/
 
 ## Notes
 
+- All resource routes are grouped under **`/api`** by a central router (`src/routes/index.ts`), keeping `app.ts` minimal and leaving room for future API versioning (e.g. `/api/v1`).
 - Data is stored **in memory** — everything resets when the server restarts. No database (yet).
 - Request bodies are validated at runtime with a hand-written type guard, since Express can't know the shape of `req.body` on its own.
 - `PATCH /posts/:id` accepts a **partial** body (`Partial<CreatePostInput>`) — only the fields you supply are updated; supplying none or empty values is rejected with `400`.

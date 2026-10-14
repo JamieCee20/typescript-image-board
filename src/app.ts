@@ -1,14 +1,9 @@
 import express from "express";
-import { PostController } from "./controllers/PostController.js";
-import postRouter from "./routes/PostRoutes.js";
+import router from "./routes/index.js";
 
 const app = express();
 
 app.use(express.json());
-
-app.get("/", (req, res) => {
-    res.send("Hello from TypeScript!");
-});
-app.use("/posts", postRouter);
+app.use("/api", router);
 
 export default app;
