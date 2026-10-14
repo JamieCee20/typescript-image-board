@@ -6,14 +6,14 @@ A small REST API for an image board — posts with a title, image URL, and conte
 
 ## Endpoints
 
-| Method | Route               | Description                  |
-| ------ | ------------------- | ---------------------------- |
-| GET    | `/`                 | Health check                 |
-| GET    | `/api/posts`        | List all posts               |
-| GET    | `/api/posts/:id`    | Get a single post by ID      |
-| POST   | `/api/posts`        | Create a new post            |
-| PATCH  | `/api/posts/:id`    | Partially update a post      |
-| DELETE | `/api/posts/:id`    | Delete a post (204, no body) |
+| Method | Route               | Description                        |
+| ------ | ------------------- | ---------------------------------- |
+| GET    | `/health`           | Health check (uptime, timestamp)   |
+| GET    | `/api/posts`        | List all posts                     |
+| GET    | `/api/posts/:id`    | Get a single post by ID            |
+| POST   | `/api/posts`        | Create a new post                  |
+| PATCH  | `/api/posts/:id`    | Partially update a post            |
+| DELETE | `/api/posts/:id`    | Delete a post (204, no body)       |
 
 ## Tech stack
 
