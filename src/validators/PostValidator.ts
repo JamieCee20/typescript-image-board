@@ -48,8 +48,8 @@ export function isUpdatePostInput(
  * valid id. Composed from isCreatePostInput, so the field rules live
  * in exactly one place.
  *
- * Used by PostService.initialize() to validate data/posts.json at
- * startup — file data is untrusted input, exactly like a request body.
+ * Used by FilePostRepository.load() to validate data/posts.json —
+ * file data is untrusted input, exactly like a request body.
  */
 export function isPost(value: unknown): value is Post {
     return (

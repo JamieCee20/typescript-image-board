@@ -1,12 +1,20 @@
 import type { CreatePostInput, Post, UpdatePostInput } from "../types/Post.js";
-import { readFile, writeFile, rename } from "node:fs/promises";
-import { isPost } from "../validators/PostValidator.js";
+import type { PostRepository } from "../repositories/PostRepository.js";
+import { FilePostRepository } from "../repositories/FilePostRepository.js";
 
-// The "database": an in-memory array seeded from data/posts.json at
-// startup (see initialize) and written back to that file after every
-// mutation (see savePosts) — so changes now SURVIVE restarts.
-// Swapping in a real database later means replacing the storage inside
-// this class; every caller keeps the same signatures.
+/**
+ * The storage backend, typed as the PostRepository INTERFACE — not the
+ * concrete class. This is dependency inversion: the service never knows
+ * a file is involved, and swapping to a database (or an in-memory fake
+ * in tests) is a one-line change here.
+ */
+const postRepository: PostRepository =
+    new FilePostRepository("data/posts.json");
+
+// The "database": an in-memory array seeded by postRepository.load()
+// at startup (see initialize) and persisted via postRepository.save()
+// after every mutation (see savePosts) — so changes SURVIVE restarts.
+// All disk I/O lives in the repository; this class keeps memory + rules.
 let posts: Post[] = [];
 
 /** ID for the next post created — re-derived from the data at startup
@@ -21,79 +29,38 @@ let nextPostId = 1;
 let writeQueue: Promise<void> = Promise.resolve();
 
 /**
- * Persists the in-memory store to data/posts.json.
+ * Persists the in-memory store through the repository.
  *
- * Atomic-write pattern: content goes to a temporary file first, then a
- * single rename() swaps it into place. rename is atomic, so a crash
- * mid-write can never leave a half-written posts.json behind.
+ * The HOW (atomic temp-file write, write queue) lives in
+ * FilePostRepository — this is just the bridge from the service's
+ * memory to whatever storage backend is configured.
  *
- * The save is appended to writeQueue (one write at a time). A FAILURE
- * is swallowed for the queue itself (`save.catch(() => {})`) so one
- * failed save never blocks the next — but the error is still returned
- * to THIS call's caller via `save`.
- *
- * @throws when the file cannot be written; the service methods let
- *   that rejection bubble up to the error handler as a 500.
+ * @throws when persistence fails; the service methods let that
+ *   rejection bubble up to the error handler as a 500.
  */
 function savePosts(): Promise<void> {
-    const contents = JSON.stringify(posts, null, 4);
-
-    // Chain this save after all previous ones. `.catch(() => {})`
-    // keeps the QUEUE healthy if this save fails — the error still
-    // reaches this save's own caller through `save`.
-    const save = writeQueue.then(async () => {
-        // Write-then-rename: readers only ever see the old or the new
-        // file, never a partial one.
-        await writeFile("data/posts.json.tmp", contents, "utf8");
-        await rename("data/posts.json.tmp", "data/posts.json");
-    });
-
-    writeQueue = save.catch(() => { });
-
-    return save;
+    return postRepository.save(posts);
 }
 
 export class PostService {
 
     /**
-     * Loads and validates data/posts.json into memory. Must run once
+     * Loads the store from the repository into memory. Must run once
      * BEFORE the server accepts requests — server.ts awaits it prior
      * to app.listen.
      *
-     * Fail-fast by design: a malformed file, a non-post entry, or
-     * duplicate IDs throws and startup aborts — better than silently
-     * serving from an empty or half-valid store.
+     * Fail-fast by design: FilePostRepository.load() rejects on a
+     * missing/malformed file or duplicate IDs, which aborts startup —
+     * better than silently serving from an empty or half-valid store.
      *
-     * @throws Error when the file is missing, is not an array of
-     *   valid posts, or contains duplicate IDs.
+     * @throws when the repository cannot produce valid data.
      */
     static async initialize(): Promise<void> {
-        // NOTE: this path is relative to the process's working
-        // directory — run npm commands from the project root. (A more
-        // robust version would resolve the path from this module's URL.)
-        const contents = await readFile("data/posts.json", "utf8");
-        // JSON.parse returns untrusted data — its type cannot be known
-        // from the file alone, so treat it as `unknown` and validate.
-        const data: unknown = JSON.parse(contents);
+        posts = await postRepository.load();
 
-        // data.every(isPost): the type guard narrows every entry to
-        // Post before anything is assigned to the store.
-        if (!Array.isArray(data) || !data.every(isPost)) {
-            throw new Error("Post data must be an array of valid posts.");
-        }
-
-        // A Set drops duplicate values — if it's smaller than the
-        // array, some IDs were reused.
-        const ids = new Set(data.map(post => post.id));
-
-        if (ids.size !== data.length) {
-            throw new Error("Post data contains duplicate IDs.");
-        }
-
-        posts = data;
-
-        // Derive the next ID from the data instead of hardcoding it:
-        // highest existing ID + 1, so new posts never collide.
+        // Derive the next ID from the loaded data instead of
+        // hardcoding it: highest existing ID + 1, so new posts never
+        // collide with anything already stored.
         nextPostId =
             posts.reduce((highestId, post) => {
                 return Math.max(highestId, post.id);
